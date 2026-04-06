@@ -23,10 +23,14 @@ public class Hand {
 
     Hand(Card[] holeCards, Card[] communityCards) {
         for (Card card : holeCards) {
-            cards.add(card);
+            if (card != null) {
+                cards.add(card);
+            }
         }
         for (Card card : communityCards) {
-            cards.add(card);
+            if (card != null) {
+                cards.add(card);
+            }
         }
     }
 
@@ -35,7 +39,22 @@ public class Hand {
     }
 
     public int compareTo(Hand other) {
-        return Integer.compare(this.handRank.ordinal(), other.handRank.ordinal());
+        int rankComparison = Integer.compare(this.handRank.ordinal(), other.handRank.ordinal());
+        if (rankComparison != 0) {
+            return rankComparison;
+        }
+
+        int maxKickerCount = Math.max(this.kickers.size(), other.kickers.size());
+        for (int i = 0; i < maxKickerCount; i++) {
+            int left = i < this.kickers.size() ? this.kickers.get(i) : 0;
+            int right = i < other.kickers.size() ? other.kickers.get(i) : 0;
+            int kickerComparison = Integer.compare(left, right);
+            if (kickerComparison != 0) {
+                return kickerComparison;
+            }
+        }
+
+        return 0;
     }
 
     public HandRank getHandRank() {
