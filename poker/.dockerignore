@@ -1,0 +1,12 @@
+.git
+.gitignore
+.cursor
+.idea
+*.iml
+*.class
+**/*.class
+out
+build
+dist
+node_modules
+agent-transcripts

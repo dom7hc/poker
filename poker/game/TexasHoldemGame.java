@@ -1,7 +1,9 @@
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class TexasHoldemGame {
@@ -26,6 +28,8 @@ public class TexasHoldemGame {
     private final int bigBlindAmount;
     private final boolean debugEnabled;
     private final int initialTotalChips;
+    private final boolean hasHumanPlayer;
+    private final Map<Player, String> playerLastActions = new HashMap<>();
     private final List<HandSummary> recentHandSummaries = new ArrayList<>();
     private int currentHandNumber;
 
@@ -50,6 +54,7 @@ public class TexasHoldemGame {
         this.currentPhase = GamePhase.PRE_FLOP;
         this.dealerPosition = 0;
         this.initialTotalChips = calculateCurrentChipTotal();
+        this.hasHumanPlayer = detectHumanPlayer(this.players);
 
         debugLog("Debug mode enabled. Initial table chips: " + initialTotalChips);
     }
@@ -67,7 +72,7 @@ public class TexasHoldemGame {
             moveDealerButton();
             handNumber++;
         }
-        System.out.println("\nGame ended.");
+        announceMatchResult(handNumber - 1, maxHands);
     }
 
     public void playHand() {
@@ -77,70 +82,79 @@ public class TexasHoldemGame {
         }
         debugValidateState("after prepare");
 
-        String lastAction = postBlinds();
+        postBlinds();
         debugValidateState("after blinds");
         dealHoleCards();
-        refreshTable("Hand " + currentHandNumber + " - Hole Cards", null, lastAction);
+        refreshTable("Hand " + currentHandNumber + " - Hole Cards", null);
         debugValidateState("after hole cards");
 
         currentPhase = GamePhase.PRE_FLOP;
         runBettingRound(false, getNextActingSeat(getBigBlindPosition()), "Hand " + currentHandNumber + " - PRE_FLOP");
         debugValidateState("after pre-flop betting");
         if (hasSingleActivePlayer()) {
-            String outcome = payoutSingleRemainingPlayer();
-            refreshTable("Hand " + currentHandNumber + " - PRE_FLOP", null, outcome);
+            payoutSingleRemainingPlayer();
+            refreshTable("Hand " + currentHandNumber + " - PRE_FLOP", null);
+            pauseForHuman("Press Enter for next hand...");
             debugValidateState("after early payout (pre-flop)");
             return;
         }
+        pauseForHuman("Press Enter for FLOP...");
 
         dealFlop();
-        refreshTable("Hand " + currentHandNumber + " - FLOP", null, "Flop dealt.");
+        refreshTable("Hand " + currentHandNumber + " - FLOP", null);
         debugValidateState("after flop deal");
         currentPhase = GamePhase.FLOP;
         runBettingRound(true, getNextActingSeat(dealerPosition), "Hand " + currentHandNumber + " - FLOP");
         debugValidateState("after flop betting");
         if (hasSingleActivePlayer()) {
-            String outcome = payoutSingleRemainingPlayer();
-            refreshTable("Hand " + currentHandNumber + " - FLOP", null, outcome);
+            payoutSingleRemainingPlayer();
+            refreshTable("Hand " + currentHandNumber + " - FLOP", null);
+            pauseForHuman("Press Enter for next hand...");
             debugValidateState("after early payout (flop)");
             return;
         }
+        pauseForHuman("Press Enter for TURN...");
 
         dealTurn();
-        refreshTable("Hand " + currentHandNumber + " - TURN", null, "Turn dealt.");
+        refreshTable("Hand " + currentHandNumber + " - TURN", null);
         debugValidateState("after turn deal");
         currentPhase = GamePhase.TURN;
         runBettingRound(true, getNextActingSeat(dealerPosition), "Hand " + currentHandNumber + " - TURN");
         debugValidateState("after turn betting");
         if (hasSingleActivePlayer()) {
-            String outcome = payoutSingleRemainingPlayer();
-            refreshTable("Hand " + currentHandNumber + " - TURN", null, outcome);
+            payoutSingleRemainingPlayer();
+            refreshTable("Hand " + currentHandNumber + " - TURN", null);
+            pauseForHuman("Press Enter for next hand...");
             debugValidateState("after early payout (turn)");
             return;
         }
+        pauseForHuman("Press Enter for RIVER...");
 
         dealRiver();
-        refreshTable("Hand " + currentHandNumber + " - RIVER", null, "River dealt.");
+        refreshTable("Hand " + currentHandNumber + " - RIVER", null);
         debugValidateState("after river deal");
         currentPhase = GamePhase.RIVER;
         runBettingRound(true, getNextActingSeat(dealerPosition), "Hand " + currentHandNumber + " - RIVER");
         debugValidateState("after river betting");
         if (hasSingleActivePlayer()) {
-            String outcome = payoutSingleRemainingPlayer();
-            refreshTable("Hand " + currentHandNumber + " - RIVER", null, outcome);
+            payoutSingleRemainingPlayer();
+            refreshTable("Hand " + currentHandNumber + " - RIVER", null);
+            pauseForHuman("Press Enter for next hand...");
             debugValidateState("after early payout (river)");
             return;
         }
+        pauseForHuman("Press Enter for SHOWDOWN...");
 
         currentPhase = GamePhase.SHOWDOWN;
         List<Player> winners = determineWinners();
         if (!winners.isEmpty()) {
-            String outcome = distributePot(winners);
-            refreshTable("Hand " + currentHandNumber + " - SHOWDOWN", null, outcome);
+            distributePot(winners);
+            refreshTable("Hand " + currentHandNumber + " - SHOWDOWN", null);
         } else {
             pot.reset();
-            refreshTable("Hand " + currentHandNumber + " - SHOWDOWN", null, "No winners detected.");
+            refreshTable("Hand " + currentHandNumber + " - SHOWDOWN", null);
         }
+        pauseForHuman("Press Enter for next hand...");
         debugValidateState("after showdown payout");
     }
 
@@ -151,6 +165,7 @@ public class TexasHoldemGame {
 
         pot.reset();
         bettingRound.reset();
+        playerLastActions.clear();
 
         communityCardCount = 0;
         Arrays.fill(communityCards, null);
@@ -167,7 +182,7 @@ public class TexasHoldemGame {
         }
     }
 
-    private String postBlinds() {
+    private void postBlinds() {
         int smallBlindPosition = getSmallBlindPosition();
         int bigBlindPosition = getBigBlindPosition();
 
@@ -193,8 +208,6 @@ public class TexasHoldemGame {
         bettingRound.currentBet = bigBlindPlayer.currentBet;
         bettingRound.lastRaiser = bigBlindPlayer;
 
-        return smallBlindPlayer.name + " posted small blind " + smallBlind
-            + ", " + bigBlindPlayer.name + " posted big blind " + bigBlind + ".";
     }
 
     private void dealHoleCards() {
@@ -222,6 +235,7 @@ public class TexasHoldemGame {
     }
 
     private void runBettingRound(boolean resetRoundState, int startSeat, String tableTitle) {
+        playerLastActions.clear();
         if (resetRoundState) {
             bettingRound.reset();
             for (Player player : players) {
@@ -229,7 +243,6 @@ public class TexasHoldemGame {
             }
         }
 
-        String lastAction = "Betting round started.";
         // Post-flop rounds start with currentBet=0, so force one action cycle.
         boolean forceActionCycle = resetRoundState;
         int safetyCounter = 0;
@@ -246,7 +259,7 @@ public class TexasHoldemGame {
                     continue;
                 }
                 anyActionTaken = true;
-                refreshTable(tableTitle, player, lastAction);
+                refreshTable(tableTitle, player);
 
                 PlayerAction action = chooseLegalAction(player);
                 int raiseAmount = 0;
@@ -263,9 +276,8 @@ public class TexasHoldemGame {
                     player.isAllIn = true;
                 }
 
-                String actionDetails = action == PlayerAction.RAISE ? " by " + raiseAmount : "";
-                lastAction = player.name + " -> " + action + actionDetails + " | pot=" + pot.getTotalPot();
-                refreshTable(tableTitle, null, lastAction);
+                playerLastActions.put(player, formatSeatAction(action, raiseAmount));
+                refreshTable(tableTitle, null);
 
                 if (hasSingleActivePlayer()) {
                     break;
@@ -280,11 +292,21 @@ public class TexasHoldemGame {
             }
         }
 
-        refreshTable(tableTitle, null, "Betting round complete.");
+        refreshTable(tableTitle, null);
         for (Player player : players) {
             player.clearBet();
         }
         bettingRound.reset();
+    }
+
+    private String formatSeatAction(PlayerAction action, int raiseAmount) {
+        return switch (action) {
+            case FOLD -> "Fold";
+            case CHECK -> "Check";
+            case CALL -> "Call";
+            case RAISE -> "Raise " + raiseAmount;
+            case ALL_IN -> "All-in";
+        };
     }
 
     private PlayerAction chooseLegalAction(Player player) {
@@ -383,6 +405,11 @@ public class TexasHoldemGame {
             Player winner = winners.get(i);
             int payout = baseShare + (i < remainder ? 1 : 0);
             winner.addChips(payout);
+            if (winners.size() == 1) {
+                playerLastActions.put(winner, "Winner +" + payout);
+            } else {
+                playerLastActions.put(winner, "Split +" + payout);
+            }
         }
 
         String resultMessage;
@@ -469,14 +496,72 @@ public class TexasHoldemGame {
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < communityCardCount; i++) {
             if (i > 0) {
-                builder.append(", ");
+                builder.append(" ");
             }
-            builder.append(communityCards[i]);
+            Card card = communityCards[i];
+            if (card == null) {
+                builder.append("[?]");
+            } else {
+                builder.append("[").append(card.getRank()).append(" ").append(card.getSuit()).append("]");
+            }
         }
         return builder.toString();
     }
 
-    private void refreshTable(String title, Player currentTurnPlayer, String lastAction) {
+    private void announceMatchResult(int handsPlayed, int maxHands) {
+        System.out.println();
+        System.out.println("Match complete.");
+        System.out.println("Hands played: " + handsPlayed + " / " + maxHands);
+
+        List<Player> chipLeaders = getChipLeaders();
+        if (chipLeaders.isEmpty()) {
+            System.out.println("No winner detected.");
+            return;
+        }
+
+        int topStack = chipLeaders.get(0).chipStack;
+        if (chipLeaders.size() == 1) {
+            Player winner = chipLeaders.get(0);
+            System.out.println("Winner: " + winner.name + " with " + winner.chipStack + " chips.");
+        } else {
+            System.out.println(
+                "Tie for first: " + formatPlayerNames(chipLeaders) + " with " + topStack + " chips each."
+            );
+        }
+    }
+
+    private List<Player> getChipLeaders() {
+        List<Player> leaders = new ArrayList<>();
+        int bestStack = Integer.MIN_VALUE;
+        for (Player player : players) {
+            if (player.chipStack > bestStack) {
+                bestStack = player.chipStack;
+                leaders.clear();
+                leaders.add(player);
+            } else if (player.chipStack == bestStack) {
+                leaders.add(player);
+            }
+        }
+        return leaders;
+    }
+
+    private boolean detectHumanPlayer(List<Player> playersToCheck) {
+        for (Player player : playersToCheck) {
+            if (player.controller instanceof HumanPlayerController) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void pauseForHuman(String prompt) {
+        if (!hasHumanPlayer) {
+            return;
+        }
+        HumanPlayerController.waitForEnter(prompt + " ");
+    }
+
+    private void refreshTable(String title, Player currentTurnPlayer) {
         clearConsole();
         String turnHint = currentTurnPlayer == null ? "-" : formatTurnHint(currentTurnPlayer);
         System.out.println(
@@ -489,7 +574,7 @@ public class TexasHoldemGame {
                 dealerPosition,
                 title,
                 turnHint,
-                lastAction
+                playerLastActions
             )
         );
     }

@@ -2,10 +2,9 @@ import java.util.Locale;
 import java.util.Scanner;
 
 public class HumanPlayerController implements PlayerController {
-    private final Scanner scanner;
+    private static final Scanner SHARED_SCANNER = new Scanner(System.in);
 
     public HumanPlayerController() {
-        this.scanner = new Scanner(System.in);
     }
 
     @Override
@@ -19,7 +18,7 @@ public class HumanPlayerController implements PlayerController {
                 System.out.print("Choose action [call, raise, fold, all-in]: ");
             }
 
-            String input = scanner.nextLine().trim().toLowerCase(Locale.ROOT);
+            String input = SHARED_SCANNER.nextLine().trim().toLowerCase(Locale.ROOT);
             if (input.equals("f") || input.equals("fold")) {
                 return PlayerAction.FOLD;
             }
@@ -71,7 +70,7 @@ public class HumanPlayerController implements PlayerController {
         int minRaise = Math.min(minimumRaise, maxRaise);
         while (true) {
             System.out.print("Enter raise amount (" + minRaise + " - " + maxRaise + ") or 'all': ");
-            String input = scanner.nextLine().trim().toLowerCase(Locale.ROOT);
+            String input = SHARED_SCANNER.nextLine().trim().toLowerCase(Locale.ROOT);
 
             if (input.equals("all") || input.equals("allin") || input.equals("all-in") || input.equals("all in")) {
                 return maxRaise;
@@ -87,6 +86,25 @@ public class HumanPlayerController implements PlayerController {
                 System.out.println("Please enter a number or 'all'.");
             }
         }
+    }
+
+    public static boolean askYesNo(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String input = SHARED_SCANNER.nextLine().trim().toLowerCase(Locale.ROOT);
+            if (input.equals("y") || input.equals("yes")) {
+                return true;
+            }
+            if (input.equals("n") || input.equals("no")) {
+                return false;
+            }
+            System.out.println("Please enter 'y' or 'n'.");
+        }
+    }
+
+    public static void waitForEnter(String prompt) {
+        System.out.print(prompt);
+        SHARED_SCANNER.nextLine();
     }
 
 }
